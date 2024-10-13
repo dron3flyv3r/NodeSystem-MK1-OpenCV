@@ -1,0 +1,5 @@
+dearpygui
+numpy==1.*
+torch
+opencv-python
+pillow
