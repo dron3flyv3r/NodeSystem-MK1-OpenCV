@@ -3,7 +3,10 @@ This is a demo project for the [NodeSystem-MK1](https://github.com/dron3flyv3r/N
 
 ## How to use
 1. Clone the repository
-2. Install the required packages
+```bash
+git clone https://github.com/dron3flyv3r/NodeSystem-MK1-OpenCV.git
+```
+3. Install the required packages
 ```bash
 pip install -r requirements.txt
 ```
