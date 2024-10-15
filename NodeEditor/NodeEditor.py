@@ -1,9 +1,11 @@
 import json
+import time
 from typing import Any
 import dearpygui.dearpygui as dpg
 import os
 import importlib
 import pickle
+import clipboard
 
 from NodeEditor.Core.Node import Node
 
@@ -11,6 +13,7 @@ class NodeEditor:
     
     _menu_node_setup: dict[str, dict[str, list[dict]]] = {}
     _minimap: bool = False
+    _copy_pasted_pressed: bool = False
 
     def __init__(self, nodes_dir: str = "NodeEditor/Nodes") -> None:
         
@@ -74,6 +77,8 @@ class NodeEditor:
 
     def load_workspace(self, sender, app_data):
         
+        self.clear_workspace()
+        
         if "selections" in app_data:
             for i in app_data["selections"].values():
                 filepath = i
@@ -86,8 +91,12 @@ class NodeEditor:
             print("File not found")
             return
         
-        with open(filepath, "r") as f:
-            data = json.load(f)
+        try:
+            with open(filepath, "r") as f:
+                data = json.load(f)
+        except Exception as e:
+            print("Data is corrupted")
+            return
             
         # Clear the current workspace
         for node in self.nodes:
@@ -156,6 +165,162 @@ class NodeEditor:
             to_node._on_linked()
             
         dpg.hide_item(self.load_dialog_id)
+        
+    def on_control_down(self, sender, app_data):
+        if dpg.is_key_down(dpg.mvKey_C):
+            if self._copy_pasted_pressed:
+                return
+            self.copy_selected_nodes()
+            self._copy_pasted_pressed = True
+            
+        elif dpg.is_key_down(dpg.mvKey_V):
+            if self._copy_pasted_pressed:
+                return
+            self.paste_nodes()
+            self._copy_pasted_pressed = True
+            
+        if not dpg.is_key_down(dpg.mvKey_C):
+            self._copy_pasted_pressed = False
+        elif not dpg.is_key_down(dpg.mvKey_V):
+            self._copy_pasted_pressed = False
+            
+    def on_control_up(self, sender, app_data):
+        self._copy_pasted_pressed = False
+        
+    def copy_selected_nodes(self):
+        print("Copying")
+        selected = dpg.get_selected_nodes(self.node_editor)
+        if len(selected) == 0:
+            print("No nodes selected")
+            return
+        
+        node_setup = {}
+        
+        node_setup["nodes"] = []
+        for node_id in selected:
+            for node in self.nodes:
+                if node._node_id == node_id:
+                    node_setup["nodes"].append({
+                        "node": node.__class__.__name__,
+                        "pos": node._node_pos,
+                        "data": node.on_save()
+                    })
+                    break
+                
+        node_setup["links"] = []
+        # Add all the links but only if both the input and output node are selected
+        for link_id, input_node, output_node in self.node_links:
+            if input_node._node_id in selected and output_node._node_id in selected:
+                node_setup["links"].append({
+                    "to": {
+                        "node": output_node.__class__.__name__,
+                        "pos": output_node._node_pos,
+                        # Witch output (1 or 2) is it based on if the input node has it as a second output or not
+                        "output_1": output_node._input_node == input_node,
+                        "output_2": output_node._input_node_2 == input_node
+                    },
+                    "from": {
+                        "node": input_node.__class__.__name__,
+                        "pos": input_node._node_pos,
+                        # Witch input (1 or 2) is it
+                        "input": output_node in input_node._output_nodes,
+                        "input_2": output_node in input_node._output_nodes_2
+                    }
+                })
+                
+        clipboard.copy(str(node_setup))
+        
+    def paste_nodes(self):
+        pased = clipboard.paste()
+        # Check if the data is a node setup
+        try:
+            node_setup = eval(pased)
+        except Exception:
+            print("Not a node setup")
+            return
+        
+        if "nodes" not in node_setup or "links" not in node_setup:
+            print(node_setup)
+            print("Not a node setup")
+            return
+        
+        if len(node_setup["nodes"]) == 0:
+            print("No nodes to paste")
+            return
+        
+        # Add all the nodes
+        pased_nodes = []
+        for node_data in node_setup["nodes"]:
+            for available_node in self.available_nodes:
+                if available_node.__name__ == node_data["node"]:
+                    new_node = available_node()
+                    self._add_node(new_node)
+                    new_node._set_node_pos(node_data["pos"][0], node_data["pos"][1])
+                    try:
+                        new_node.on_load(node_data["data"])
+                    except Exception:
+                        pass
+                    pased_nodes.append(new_node)
+                    break
+                
+        # Add all the links
+        for link_data in node_setup["links"]:
+            from_data = link_data["from"]
+            to_data = link_data["to"]
+            
+            from_node = to_node = None
+            for node in pased_nodes:
+                if node.__class__.__name__ == from_data["node"] and node._node_pos == from_data["pos"]:
+                    from_node = node
+                if node.__class__.__name__ == to_data["node"] and node._node_pos == to_data["pos"]:
+                    to_node = node
+                if from_node and to_node:
+                    break
+            
+            if not from_node or not to_node:
+                print(f"Nodes not found: from_node={from_node}, to_node={to_node}")
+                continue
+            
+            attr_Output = None
+            if from_data.get("input"):
+                from_node.add_output_node(to_node)
+                attr_Output = from_node._output_id
+            elif from_data.get("input_2"):
+                from_node.add_output_node_2(to_node)
+                attr_Output = from_node._output_id_2
+            
+            attr_Input = None
+            if to_data.get("output_1"):
+                to_node.set_input_node(from_node)
+                attr_Input = to_node._input_id
+            elif to_data.get("output_2"):
+                to_node.set_input_node_2(from_node)
+                attr_Input = to_node._input_id_2
+            
+            if not attr_Input or not attr_Output:
+                print(f"Attributes not found: attr_Input={attr_Input}, attr_Output={attr_Output}")
+                continue
+            
+            node_link_id = dpg.generate_uuid()
+            dpg.add_node_link(attr_Input, attr_Output, parent=self.node_editor, tag=node_link_id)
+            self.node_links.append((node_link_id, from_node, to_node))
+            from_node._on_linked()
+            to_node._on_linked()
+            print(f"Linking nodes: from_node={from_node.label}, to_node={to_node.label}, link_id={node_link_id}")
+            
+        # Move all the nodes to the mouse position but keep the relative positions
+        mouse_pos = dpg.get_mouse_pos(local=False)
+        # Find the average position of all the nodes and move them to the mouse position
+        pased_nodes_pos = [node._node_pos for node in pased_nodes]
+        pased_nodes_pos = [sum(x) / len(x) for x in zip(*pased_nodes_pos)]
+        mouse_pos = [mouse_pos[0] - pased_nodes_pos[0], mouse_pos[1] - pased_nodes_pos[1]]
+        
+        for node in pased_nodes:
+            node._set_node_pos(node._node_pos[0] + mouse_pos[0], node._node_pos[1] + mouse_pos[1])
+            
+        # Deslect all the nodes and links
+        dpg.clear_selected_nodes(self.node_editor)
+        dpg.clear_selected_links(self.node_editor)
         
     def clear_workspace(self):
         # Delete all the links
@@ -317,6 +482,11 @@ class NodeEditor:
         node._compose(self.node_editor)
         node.on_init()
         
+    def _delete_selected_node(self):
+        selected = dpg.get_selected_nodes(self.node_editor)
+        for node_id in selected:
+            self._node_delete_callback(None, None, node_id)
+        
     def _node_delete_callback(self, sender, app_data, user_data):
         
         node_id = user_data
@@ -455,13 +625,15 @@ class NodeEditor:
         dpg.configure_item(self.node_editor, minimap=self._minimap)
         
     def start(self):
-        dpg.create_context()
         self._setup_menu()
             
         with dpg.handler_registry():
             dpg.add_mouse_click_handler(button=dpg.mvMouseButton_Right, callback=self.right_click_cb)
             dpg.add_mouse_click_handler(button=dpg.mvMouseButton_Left, callback=self.left_click_cb)
             dpg.add_key_down_handler(key=dpg.mvKey_Escape, callback=self.right_click_key_cb)
+            dpg.add_key_press_handler(key=dpg.mvKey_Delete, callback=self._delete_selected_node)
+            dpg.add_key_press_handler(key=dpg.mvKey_Control, callback=self.on_control_down)
+            dpg.add_key_release_handler(key=dpg.mvKey_Control, callback=self.on_control_up)
 
         with dpg.window(label="Right click window", modal=False, show=False, tag=self.right_click_menu, no_title_bar=True):
             # Add the nodes to the right click menu
@@ -516,5 +688,6 @@ class NodeEditor:
         
         dpg.show_viewport()
         dpg.start_dearpygui()
+            
         self.save_workspace(None, {"file_path_name": "temp_node_editor.json"})
         dpg.destroy_context()

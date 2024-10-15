@@ -102,7 +102,9 @@ class Node:
     def __init__(
         self,
         lable: str,
-        type: Literal["Input", "Both", "Output", "BothDualOut", "BothDualIn", "DualInDualOut"] = "Both",
+        type: Literal[
+            "Input", "Both", "Output", "BothDualOut", "BothDualIn", "DualInDualOut"
+        ] = "Both",
         catagory: Literal["Inputs", "Output", "Filter"] | str = "All",
         max_width: int = 100,
         *,
@@ -139,17 +141,17 @@ class Node:
         self._custom_outputs: list[tuple[Callable[[Any], Any], str]] = []
 
         self._last_update_call = 0
-        self._min_delay = 50 # ms
+        self._min_delay = 50  # ms
         self._update_call: bool = False
 
         threading.Thread(target=self._update_thread, daemon=True).start()
-        
+
     def on_init(self):
         pass
-    
+
     def on_load(self, data: dict):
         pass
-    
+
     def on_save(self) -> dict:
         return {}
 
@@ -186,7 +188,9 @@ class Node:
     ) -> NodePackage | tuple[NodePackage, NodePackage]: ...
 
     @overload
-    def execute(self, data: NodePackage, data2: NodePackage) -> NodePackage: ...
+    def execute(
+        self, data: NodePackage, data2: NodePackage
+    ) -> NodePackage | tuple[NodePackage, NodePackage]: ...
 
     def execute(
         self, data: NodePackage, data2: NodePackage | None = None
@@ -471,7 +475,7 @@ class Node:
                 if temp_data is not None:
                     node._auto_set_latest_data(temp_data, self)
                 node._call_output_nodes(temp_data)
-                
+
         elif self.type == "DualInDualOut":
             for node in self._output_nodes:
                 temp_data = copy.deepcopy(output1)
@@ -503,24 +507,30 @@ class Node:
 
     def _set_node_pos(self, x: float, y: float):
         dpg.set_item_pos(self._node_id, [x, y])
-        
+
     def to_dict(self):
         return {
-            'label': self.label,
-            'type': self.type,
-            'data': self._latest_data,
-            'output_nodes': [node._node_id for node in self._output_nodes],
-            'output_nodes_2': [node._node_id for node in self._output_nodes_2] if hasattr(self, '_output_nodes_2') else []
+            "label": self.label,
+            "type": self.type,
+            "data": self._latest_data,
+            "output_nodes": [node._node_id for node in self._output_nodes],
+            "output_nodes_2": (
+                [node._node_id for node in self._output_nodes_2]
+                if hasattr(self, "_output_nodes_2")
+                else []
+            ),
         }
 
     @classmethod
     def from_dict(cls, data, node_map):
-        node = cls(data['label'])
-        node.type = data['type']
-        node._latest_data = data['data']
-        node._output_nodes = [node_map[node_id] for node_id in data['output_nodes']]
-        if 'output_nodes_2' in data:
-            node._output_nodes_2 = [node_map[node_id] for node_id in data['output_nodes_2']]
+        node = cls(data["label"])
+        node.type = data["type"]
+        node._latest_data = data["data"]
+        node._output_nodes = [node_map[node_id] for node_id in data["output_nodes"]]
+        if "output_nodes_2" in data:
+            node._output_nodes_2 = [
+                node_map[node_id] for node_id in data["output_nodes_2"]
+            ]
         return node
 
     def __str__(self) -> str:

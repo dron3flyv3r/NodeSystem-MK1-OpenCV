@@ -164,3 +164,8 @@ cython_debug/
 # Mac
 ._**
 .DS_Store
+
+# file test
+*.mp4
+*.jpg
+*json

@@ -50,6 +50,8 @@ class ImreadVideo(Node):
         texture_image = cv2.copyMakeBorder(texture_image, (400 - new_height) // 2, (400 - new_height) // 2, (400 - new_width) // 2, (400 - new_width) // 2, cv2.BORDER_CONSTANT, value=[0, 0, 0, 0])
         texture_image = texture_image.astype(float)
         texture_image /= 255
+        # Making sure the image is 400x400 (It a windows thing idk why)
+        texture_image = cv2.resize(texture_image, (400, 400))
         dpg.set_value(self.image_view, texture_image.flatten())
         
     def _set_first_frame(self):
@@ -72,7 +74,7 @@ class ImreadVideo(Node):
                 self.vidoe_running = False
                 self.on_error("No video selected")
                 continue
-            cap = cv2.VideoCapture(self.video_selected if self.video_selected else 0)
+            cap = cv2.VideoCapture(self.video_selected)
             start = time.time()
             while self.vidoe_running:
                 ret, frame = cap.read()
