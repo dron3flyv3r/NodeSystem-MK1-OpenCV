@@ -129,9 +129,9 @@ class Node:
         output_lable: str = "",
         output_lable_2: str = "",
     ) -> None:
-        self._label = lable
-        self._type = type
-        self._catagory = catagory
+        self.label = lable
+        self.type = type
+        self.catagory = catagory
         self._max_width = max_width if max_width > 100 else 100
 
         self._input_lable = input_lable
@@ -212,7 +212,7 @@ class Node:
         self, data: NodePackage, data2: NodePackage | None = None
     ) -> NodePackage | tuple[NodePackage, NodePackage]:
 
-        print(f"Executing: {self._label}")
+        print(f"Executing: {self.label}")
 
         return data
 
@@ -224,12 +224,12 @@ class Node:
 
     def _compose(self, parent: int | str = 0):
 
-        with dpg.node(label=self._label, tag=self._node_id, parent=parent):
+        with dpg.node(label=self.label, tag=self._node_id, parent=parent):
 
-            if self._type == "Output":
+            if self.type == "Output":
                 with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
                     dpg.add_button(
-                        label="Run", callback=lambda: self._call_output_nodes(NodePackage())
+                        label="Run", callback=lambda: self._call_output_nodes()
                     )
 
             with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
@@ -240,7 +240,7 @@ class Node:
                 )
                 dpg.add_text("", wrap=self._max_width, tag=self._error_text_id)
 
-            if self._type != "Output":
+            if self.type != "Output":
                 with dpg.node_attribute(
                     label="Input",
                     attribute_type=dpg.mvNode_Attr_Input,
@@ -249,7 +249,7 @@ class Node:
                 ):
                     dpg.add_text(self._input_lable or "Input")
 
-            if self._type == "BothDualIn" or self._type == "DualInDualOut":
+            if self.type == "BothDualIn" or self.type == "DualInDualOut":
                 with dpg.node_attribute(
                     label="Input 2",
                     attribute_type=dpg.mvNode_Attr_Input,
@@ -263,7 +263,7 @@ class Node:
                 self.compose()
                 dpg.add_spacer(height=10)
 
-            if self._type != "Input":
+            if self.type != "Input":
                 with dpg.node_attribute(
                     label="Output",
                     attribute_type=dpg.mvNode_Attr_Output,
@@ -275,7 +275,7 @@ class Node:
             # with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
             #     dpg.add_spacer(height=10)
 
-            if self._type == "BothDualOut" or self._type == "DualInDualOut":
+            if self.type == "BothDualOut" or self.type == "DualInDualOut":
                 with dpg.node_attribute(
                     label="Output 2",
                     attribute_type=dpg.mvNode_Attr_Output,
@@ -370,19 +370,19 @@ class Node:
 
     def set_input_node(self, node: "Node"):
         self._input_node = node
-        print("Setting input node", node._label)
+        print("Setting input node", node.label)
         print(
             "Setting input node 2",
-            n._label if (n := self._input_node_2) is not None else None,
+            n.label if (n := self._input_node_2) is not None else None,
         )
 
     def set_input_node_2(self, node: "Node"):
         self._input_node_2 = node
         print(
             "Setting input node",
-            n._label if (n := self._input_node) is not None else None,
+            n.label if (n := self._input_node) is not None else None,
         )
-        print("Setting input node 2", node._label)
+        print("Setting input node 2", node.label)
 
     def auto_set_input_node(self, node: "Node", link_id: str | int):
         if self._input_id == link_id:
@@ -415,7 +415,7 @@ class Node:
 
     def _auto_set_latest_data(self, data: NodePackage, node: "Node"):
         # Check to see if the data is from the first or second input
-        if self._type == "BothDualIn" or self._type == "DualInDualOut":
+        if self.type == "BothDualIn" or self.type == "DualInDualOut":
             if self._input_node and self._input_node._node_id == node._node_id:
                 self._latest_data = data
             else:
@@ -430,11 +430,12 @@ class Node:
         if data is None:
             data = NodePackage()
 
-        if self._type == "Output":
+        if self.type == "Output":
+            data._start_time = time.time()
             self._latest_data = copy.deepcopy(data)
         # self._latest_data = copy.deepcopy(data)
 
-        if self._type == "BothDualIn" or self._type == "DualInDualOut":
+        if self.type == "BothDualIn" or self.type == "DualInDualOut":
             if self._latest_data_2 is None or self._latest_data is None:
                 print("Not enough data")
                 self._on_warning()
@@ -495,7 +496,7 @@ class Node:
             
         futures: list[future.Future] = []
 
-        if self._type == "BothDualOut":
+        if self.type == "BothDualOut":
             with future.ThreadPoolExecutor() as executor:
                 for node in self._output_nodes:
                     temp_data = copy.deepcopy(output1)
@@ -510,7 +511,7 @@ class Node:
                     futures.append(executor.submit(node._call_output_nodes, temp_data))
                     # node._call_output_nodes(temp_data)
 
-        elif self._type == "DualInDualOut":
+        elif self.type == "DualInDualOut":
             with future.ThreadPoolExecutor() as executor:
                 for node in self._output_nodes:
                     temp_data = copy.deepcopy(output1)
@@ -551,8 +552,8 @@ class Node:
 
     def to_dict(self):
         return {
-            "label": self._label,
-            "type": self._type,
+            "label": self.label,
+            "type": self.type,
             "data": self._latest_data,
             "output_nodes": [node._node_id for node in self._output_nodes],
             "output_nodes_2": (
@@ -565,7 +566,7 @@ class Node:
     @classmethod
     def from_dict(cls, data, node_map):
         node = cls(data["label"])
-        node._type = data["type"]
+        node.type = data["type"]
         node._latest_data = data["data"]
         node._output_nodes = [node_map[node_id] for node_id in data["output_nodes"]]
         if "output_nodes_2" in data:
@@ -577,18 +578,18 @@ class Node:
     def __str__(self) -> str:
         return str(
             {
-                "label": self._label,
-                "type": self._type,
+                "label": self.label,
+                "type": self.type,
                 "node_id": self._node_id,
                 "input1": (
                     {}
                     if (n1 := self._input_node) is None
-                    else {"label": n1._label, "node_id": n1._node_id}
+                    else {"label": n1.label, "node_id": n1._node_id}
                 ),
                 "input2": (
                     {}
                     if (n2 := self._input_node_2) is None
-                    else {"label": n2._label, "node_id": n2._node_id}
+                    else {"label": n2.label, "node_id": n2._node_id}
                 ),
                 "output1": self._output_nodes,
                 "output2": self._output_nodes_2,
