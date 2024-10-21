@@ -8,6 +8,8 @@ class NodePackage:
     mask: cv2.typing.MatLike
     _start_time = time.time()
     
+    sync_id: str | None = None
+    
     def copy(self) -> 'NodePackage':
         new_package = NodePackage()
         for key, value in self.__dict__.items():

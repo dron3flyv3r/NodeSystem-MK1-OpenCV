@@ -4,6 +4,7 @@ from typing import Any, Callable, Literal, overload
 import dearpygui.dearpygui as dpg
 import copy
 import traceback
+import concurrent.futures as future
 
 from NodeEditor.Core.NodePackage import NodePackage
 
@@ -88,7 +89,22 @@ with dpg.theme() as linked_theme:
             (0, 96, 96, 150),
             category=dpg.mvThemeCat_Nodes,
         )
-
+        
+with dpg.theme() as executing_theme:
+    with dpg.theme_component():
+        dpg.add_theme_color(
+            dpg.mvNodeCol_TitleBar, (0, 0, 96, 255), category=dpg.mvThemeCat_Nodes
+        )
+        dpg.add_theme_color(
+            dpg.mvNodeCol_TitleBarHovered,
+            (0, 0, 96, 150),
+            category=dpg.mvThemeCat_Nodes,
+        )
+        dpg.add_theme_color(
+            dpg.mvNodeCol_TitleBarSelected,
+            (0, 0, 96, 150),
+            category=dpg.mvThemeCat_Nodes,
+        )
 
 class Node:
     _node_delete_callback: Callable[[Any, Any, Any], None]
@@ -141,7 +157,7 @@ class Node:
         self._custom_outputs: list[tuple[Callable[[Any], Any], str]] = []
 
         self._last_update_call = 0
-        self._min_delay = 50  # ms
+        self._min_delay = 50 # ms
         self._update_call: bool = False
 
         threading.Thread(target=self._update_thread, daemon=True).start()
@@ -425,6 +441,13 @@ class Node:
                 self._on_warning()
                 return
             try:
+                try:
+                    dpg.bind_item_theme(self._node_id, executing_theme)
+                except Exception as e:
+                    try:
+                        dpg.set_item_theme(self._node_id, executing_theme)
+                    except Exception as e:
+                        print("Error setting theme")
                 output = (
                     self.execute(
                         copy.deepcopy(self._latest_data),
@@ -444,6 +467,13 @@ class Node:
             # self._latest_output = output
         else:
             try:
+                try:
+                    dpg.bind_item_theme(self._node_id, executing_theme)
+                except Exception as e:
+                    try:
+                        dpg.set_item_theme(self._node_id, executing_theme)
+                    except Exception as e:
+                        print("Error setting theme")
                 output = (
                     self.execute(copy.deepcopy(data))
                     if not self._skip_execution
@@ -463,35 +493,47 @@ class Node:
             output1, output2 = output
         else:
             output1 = output
+            
+        futures: list[future.Future] = []
 
         if self.type == "BothDualOut":
-            for node in self._output_nodes:
-                temp_data = copy.deepcopy(output1)
-                node._auto_set_latest_data(temp_data, self)
-                node._call_output_nodes(temp_data)
-
-            for node in self._output_nodes_2:
-                temp_data = copy.deepcopy(output2)
-                if temp_data is not None:
+            with future.ThreadPoolExecutor() as executor:
+                for node in self._output_nodes:
+                    temp_data = copy.deepcopy(output1)
                     node._auto_set_latest_data(temp_data, self)
-                node._call_output_nodes(temp_data)
+                    futures.append(executor.submit(node._call_output_nodes, temp_data))
+                    # node._call_output_nodes(temp_data)
+            with future.ThreadPoolExecutor() as executor:
+                for node in self._output_nodes_2:
+                    temp_data = copy.deepcopy(output2)
+                    if temp_data is not None:
+                        node._auto_set_latest_data(temp_data, self)
+                    futures.append(executor.submit(node._call_output_nodes, temp_data))
+                    # node._call_output_nodes(temp_data)
 
         elif self.type == "DualInDualOut":
-            for node in self._output_nodes:
-                temp_data = copy.deepcopy(output1)
-                node._latest_data = temp_data
-                node._call_output_nodes(temp_data)
-
-            for node in self._output_nodes_2:
-                temp_data = copy.deepcopy(output2)
-                if temp_data is not None:
-                    node._latest_data_2 = temp_data
-                node._call_output_nodes(temp_data)
+            with future.ThreadPoolExecutor() as executor:
+                for node in self._output_nodes:
+                    temp_data = copy.deepcopy(output1)
+                    node._latest_data = temp_data
+                    futures.append(executor.submit(node._call_output_nodes, temp_data))
+                    # node._call_output_nodes(temp_data)
+            with future.ThreadPoolExecutor() as executor:
+                for node in self._output_nodes_2:
+                    temp_data = copy.deepcopy(output2)
+                    if temp_data is not None:
+                        node._latest_data_2 = temp_data
+                    futures.append(executor.submit(node._call_output_nodes, temp_data))
+                    # node._call_output_nodes(temp_data)
         else:
-            for node in self._output_nodes:
-                temp_data = copy.deepcopy(output1)
-                node._auto_set_latest_data(temp_data, self)
-                node._call_output_nodes(temp_data)
+            with future.ThreadPoolExecutor() as executor:
+                for node in self._output_nodes:
+                    temp_data = copy.deepcopy(output1)
+                    node._auto_set_latest_data(temp_data, self)
+                    futures.append(executor.submit(node._call_output_nodes, temp_data))
+                    # node._call_output_nodes(temp_data)
+                    
+        future.wait(futures, return_when=future.ALL_COMPLETED)
 
     def _toggle_skip_execution(self):
         self._skip_execution = not self._skip_execution
