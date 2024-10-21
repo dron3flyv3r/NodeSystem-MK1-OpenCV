@@ -351,7 +351,7 @@ class NodeEditor:
     def _setup_menu(self):
         for node in self.available_nodes:
             temp_node: Node = node()
-            catagory = temp_node.catagory
+            catagory = temp_node._catagory
             main_catagory = catagory if "/" not in catagory else catagory.split("/")[0]
             sub_catagory = "" if "/" not in catagory else catagory.split("/")[1]
             
@@ -363,7 +363,7 @@ class NodeEditor:
             
                 
             d = {
-                    "name": temp_node.label,
+                    "name": temp_node._label,
                     "user_data": node
                 }
                         
@@ -394,19 +394,19 @@ class NodeEditor:
                 print("Output Node not found")
                 return
             
-            print(f"Linking {input_node.label} to {output_node.label} (Dual Output)")
+            print(f"Linking {input_node._label} to {output_node._label} (Dual Output)")
             input_node.add_output_node_2(output_node)
             output_node.auto_set_input_node(input_node, output_node_id)
             
         elif input_node and output_node:
-            print(f"Linking {input_node.label} to {output_node.label}")
+            print(f"Linking {input_node._label} to {output_node._label}")
             input_node.add_output_node(output_node)
             output_node.auto_set_input_node(input_node, output_node_id)
             
         else:
             print("input_id:", input_node_id, "output_id:", output_node_id)
             for node in self.nodes:
-                print(node.label, node._input_id, node._output_id)
+                print(node._label, node._input_id, node._output_id)
                 print()
             return
         
@@ -432,7 +432,7 @@ class NodeEditor:
             return
             
         input_node, output_node = node_set
-        print(f"Delinking {input_node.label} from {output_node.label}")
+        print(f"Delinking {input_node._label} from {output_node._label}")
         input_node.remove_output_node(output_node)
         output_node.remove_input_node(input_node)
         
