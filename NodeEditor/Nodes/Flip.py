@@ -24,5 +24,5 @@ class Flip(Node):
         
     def execute(self, data: NodePackage) -> NodePackage:
         data.image = cv2.flip(data.image, 1) if dpg.get_value(self.horizontal) else data.image
-        data.image = cv2.flip(data.image, 0) if dpg.get_value(self.vertical) else data.image
+        data.image = cv2.flip(data.image, 0) if dpg.get_value(self.vertical) else data.image        
         return data

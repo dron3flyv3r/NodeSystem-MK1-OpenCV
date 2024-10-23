@@ -45,17 +45,22 @@ class Morphological(Node):
         
         if kernel == "Rect":
             kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (kernel_size, kernel_size))
+            
         elif kernel == "Cross":
             kernel = cv2.getStructuringElement(cv2.MORPH_CROSS, (kernel_size, kernel_size))
+            
         elif kernel == "Ellipse":
             kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
         
         if operation == "Erosion":
             data.image = cv2.erode(data.image, kernel, iterations=iterations)
+            
         elif operation == "Dilation":
             data.image = cv2.dilate(data.image, kernel, iterations=iterations)
+            
         elif operation == "Opening":
             data.image = cv2.morphologyEx(data.image, cv2.MORPH_OPEN, kernel, iterations=iterations)
+            
         elif operation == "Closing":
             data.image = cv2.morphologyEx(data.image, cv2.MORPH_CLOSE, kernel, iterations=iterations)
             

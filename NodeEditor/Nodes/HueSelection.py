@@ -33,7 +33,7 @@ class HueSelection(Node):
         lower = (self.hue - self.window, 0, 0)
         upper = (self.hue + self.window, 255, 255)
         mask = cv2.inRange(hsv, lower, upper) # type: ignore
-        data.image = mask
+        data.image = mask                
         return data
         
     def compose(self):

@@ -91,5 +91,5 @@ class Imread(Node):
     def execute(self, data: NodePackage) -> NodePackage:
         
         data.image = self.image
-        
+                
         return data

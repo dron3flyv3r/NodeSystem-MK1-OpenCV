@@ -37,5 +37,5 @@ class Threshold(Node):
         _, oneChannelMax = cv2.threshold(oneChannelMax, dpg.get_value(self.threshold_max_id), 255, cv2.THRESH_BINARY_INV)
         
         data.image = cv2.bitwise_and(oneChannelMin, oneChannelMax)
-        
+                        
         return data

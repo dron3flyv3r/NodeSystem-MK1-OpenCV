@@ -95,5 +95,5 @@ class KMeanClustering(Node):
             image = cv2.cvtColor(image, cv2.COLOR_LAB2BGR)
             
         data.image = image
-
+                
         return data

@@ -26,6 +26,6 @@ class Merge(Node):
         
         for i in range(3):
             image_top[:,:,i] = np.where(image_buttom[:,:,3] == 0, image_top[:,:,i], image_buttom[:,:,i])
-            
+                                
         data.image = image_top        
         return data

@@ -50,5 +50,5 @@ class Imshow(Node):
         rgba_image = rgba_image.astype(float)
         rgba_image /= 255
         dpg.set_value(self.image_input, rgba_image.flatten())
-        
+                        
         return data
