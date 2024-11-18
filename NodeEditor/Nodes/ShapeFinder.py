@@ -1,5 +1,6 @@
 import cv2
 import dearpygui.dearpygui as dpg
+import numpy as np
 
 from NodeEditor.Core.Node import Node
 from NodeEditor.Core.NodePackage import NodePackage
@@ -29,40 +30,29 @@ class ShapeFinder(Node):
         
         self.shape = dpg.get_value(self.shape_id)
         
+        # Ensure self.shape is a string
+        if isinstance(self.shape, int):
+            self.shape = self.shapes[self.shape]
+        
+        # Prepare reference contour for matching
+        ref_shape = None
         if self.shape == "Rectangle":
-            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            for contour in contours:
-                x, y, w, h = cv2.boundingRect(contour)
-                cv2.rectangle(data.image, (x, y), (x+w, y+h), (0, 255, 0), 2)
-                
+            ref_shape = np.array([[0,0], [1,0], [1,1], [0,1]]).reshape((-1,1,2))
         elif self.shape == "Circle":
-            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            for contour in contours:
-                (x, y), radius = cv2.minEnclosingCircle(contour)
-                center = (int(x), int(y))
-                radius = int(radius)
-                cv2.circle(data.image, center, radius, (0, 255, 0), 2)
-                
+            ref_shape = cv2.ellipse2Poly((0,0), (1,1), 0, 0, 360, 10)
         elif self.shape == "Ellipse":
-            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            for contour in contours:
-                ellipse = cv2.fitEllipse(contour)
-                cv2.ellipse(data.image, ellipse, (0, 255, 0), 2)
-                
+            ref_shape = cv2.ellipse2Poly((0,0), (1,2), 0, 0, 360, 10)
         elif self.shape == "Line":
-            contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-            for contour in contours:
-                rows, cols = data.image.shape[:2]
-                [vx, vy, x, y] = cv2.fitLine(contour, cv2.DIST_L2, 0, 0.01, 0.01)
-                lefty = int((-x*vy/vx) + y)
-                righty = int(((cols-x)*vy/vx)+y)
-                cv2.line(data.image, (cols-1, righty), (0, lefty), (0, 255, 0), 2)
-                
+            ref_shape = np.array([[0,0], [1,0]]).reshape((-1,1,2))
         elif self.shape == "Polygon":
+            angles = np.linspace(0, 2*np.pi, 6)[:-1]
+            ref_shape = np.array([[np.cos(a), np.sin(a)] for a in angles]).reshape((-1,1,2))
+        
+        if ref_shape is not None:
             contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
             for contour in contours:
-                epsilon = 0.02 * cv2.arcLength(contour, True)
-                approx = cv2.approxPolyDP(contour, epsilon, True)
-                cv2.drawContours(data.image, [approx], 0, (0, 255, 0), 2)
-                
+                match_score = cv2.matchShapes(np.array(ref_shape, dtype=np.float32), np.array(contour, dtype=np.float32), cv2.CONTOURS_MATCH_I1, 0.0)
+                if match_score < 0.1:  # Adjust threshold as needed
+                    cv2.drawContours(data.image, [contour], -1, (0, 255, 0), 2)
+        
         return data, data2
