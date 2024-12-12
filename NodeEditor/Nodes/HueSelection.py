@@ -37,5 +37,6 @@ class HueSelection(Node):
         return data
         
     def compose(self):
-        dpg.add_slider_float(label="Hue", default_value=90, min_value=0, max_value=180, width=100, tag=self.hue_id, callback=self.update, format="%.0f")
+        # dpg.add_slider_float(label="Hue", default_value=90, min_value=0, max_value=180, width=100, tag=self.hue_id, callback=self.update, format="%.0f")
+        dpg.add_input_float(label="Hue", default_value=90, width=100, tag=self.hue_id, callback=self.update)
         dpg.add_slider_int(label="Window", default_value=10, min_value=0, max_value=180, width=100, tag=self.window_id, callback=self.update)
